@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:rive/rive.dart';
+//3.1 importar librería de timer
+import 'dart:async';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -9,179 +11,201 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  // Estado para ocultar/mostrar la contraseña
-  bool _obscurePassword = true;
+  bool obscurePassword = true;
 
-  // Controladores (cerebro) de la animación
+  // Cerebro de la lógica de las animaciones
   StateMachineController? controller;
-  SMIBool? isChecking;
-  SMIBool? isHandsUp;
-  SMITrigger? trigSuccess;
-  SMITrigger? trigFail;
+  // SMI: State Machine Input
+  SMIBool? isChecking; // Activa el modo chismoso
+  SMIBool? isHandsUp; // Se tapa los ojos
+  SMITrigger? trigSuccess; // Se emociona
+  SMITrigger? trigFail; // Se pone triste
+  //2.1 variable para recorrido de la mirada
+  SMINumber? numLook;
 
-  // 1) FocusNode
-  final _emailFocus = FocusNode();
-  final _passwordFocus = FocusNode();
+  // 1.1) FocusNode (FALTABA LOS PARÉNTESIS)
+  final emailFocus = FocusNode();
+  final passFocus = FocusNode();
+  //3.2 la variable de timer deterner la mirada de teclear
+  Timer? _typingDebounce;
 
-  // 2) Listeners (0yentes/Chismosos)
   @override
   void initState() {
     super.initState();
-    _emailFocus.addListener(_onFocusChange);
-    _passwordFocus.addListener(_onFocusChange);
-  }
 
-  void _onFocusChange() {
-    if (isHandsUp == null || isChecking == null) return;
-
-    if (!_emailFocus.hasFocus && !_passwordFocus.hasFocus) {
-      // Ningún campo seleccionado
-      isChecking!.change(false);
-      isHandsUp!.change(false);
-    } else if (_emailFocus.hasFocus) {
-      // Email seleccionado
-      isChecking!.change(true);
-      isHandsUp!.change(false);
-    } else if (_passwordFocus.hasFocus) {
-      // Password seleccionado
-      if (_obscurePassword) {
-        isChecking!.change(true);
-        isHandsUp!.change(false);
-      } else {
-        isChecking!.change(false);
-        isHandsUp!.change(true);
+    // 2) Listeners
+    emailFocus.addListener(() {
+      if (emailFocus.hasFocus) {
+        isHandsUp?.change(false);
+        //2.2 mirada neutral al email
+        numLook?.value = 50.0;
+        isHandsUp?.change(false);
       }
-    }
+    });
+
+    passFocus.addListener(() {
+      isHandsUp?.change(passFocus.hasFocus);
+    });
   }
 
-  // 4) Liberación de recursos / limpieza de
   @override
   void dispose() {
-    _emailFocus.dispose();
-    _passwordFocus.dispose();
+    // Liberar memoria
+    emailFocus.dispose();
+    passFocus.dispose();
+    _typingDebounce?.cancel();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.of(context).size;
+    final Size size = MediaQuery.of(context).size;
 
     return Scaffold(
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 50),
-          child: Column(children: [
-            // Animación Rive
-            SizedBox(
-              width: size.width,
-              height: 200,
-              child: RiveAnimation.asset(
-                'assets/animated_login_character.riv',
-                stateMachines: ['Login Machine'],
-                onInit: (artboard) {
-                  controller = StateMachineController.fromArtboard(
-                      artboard, 'Login Machine');
-                  if (controller == null) return;
-                  artboard.addController(controller!);
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            children: [
+              SizedBox(
+                width: size.width,
+                height: 200,
+                child: RiveAnimation.asset(
+                  'assets/animated_login_character.riv',
+                  stateMachines: ["Login Machine"],
+                  onInit: (artboard) {
+                    controller = StateMachineController.fromArtboard(
+                      artboard,
+                      "Login Machine",
+                    );
+                    if (controller == null) return;
+                    artboard.addController(controller!);
+                    isChecking = controller!.findSMI('isChecking');
+                    isHandsUp = controller!.findSMI('isHandsUp');
+                    trigSuccess = controller!.findSMI('trigSuccess');
+                    trigFail = controller!.findSMI('trigFail');
 
-                  isChecking = controller!.findSMI('isChecking');
-                  isHandsUp = controller!.findSMI('isHandsUp');
-                },
-                fit: BoxFit.contain,
+                    //2.3 inicializar variable de la animación
+                    numLook = controller!.findSMI('numLook');
+                  }, //clamp
+                ),
               ),
-            ),
+              const SizedBox(height: 10),
+              TextField(
+                focusNode: emailFocus,
+                onChanged: (value) {
+                  if (isHandsUp != null) {
+                    isChecking!.change(true);
+                    //ajuste de limites de 0 a 100
+                    final look = (value.length / 80.0 * 100.0).clamp(
+                      0.0,
+                      100.0,
+                    );
+                    numLook?.value = look;
 
-            const SizedBox(height: 10),
-
-            // Email
-            TextField(
-                focusNode: _emailFocus,
+                    //3.3 si vuelve a teclear, se reinicia el timer
+                    _typingDebounce?.cancel(); //cancela el timer existente
+                    _typingDebounce = Timer(const Duration(seconds: 3), () {
+                      if (!mounted) {
+                        return; // si la pantalla se cierra
+                      }
+                    });
+                  }
+                  if (isChecking == null) return;
+                  isChecking!.change(true);
+                },
                 keyboardType: TextInputType.emailAddress,
                 decoration: InputDecoration(
-                  hintText: 'Introduce tu email',
+                  labelText: 'Email',
                   prefixIcon: const Icon(Icons.mail),
                   border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12)),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                focusNode: passFocus,
                 onChanged: (value) {
-                  if (isHandsUp != null) isHandsUp!.change(false);
-                  if (isChecking != null) isChecking!.change(true);
-                }),
-
-            const SizedBox(height: 10),
-
-            // Contraseña
-            TextField(
-                focusNode: _passwordFocus,
-                obscureText: _obscurePassword,
+                  if (isChecking != null) {
+                    isChecking!.change(false);
+                  }
+                  if (isHandsUp == null) return;
+                  // isHandsUp!.change(true); // Comentado por ti
+                },
+                obscureText: obscurePassword,
                 decoration: InputDecoration(
-                  hintText: 'Contraseña',
+                  labelText: 'Password',
                   prefixIcon: const Icon(Icons.lock),
                   border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12)),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                   suffixIcon: IconButton(
-                      icon: Icon(_obscurePassword
-                          ? Icons.visibility
-                          : Icons.visibility_off),
-                      onPressed: () {
-                        setState(() => _obscurePassword = !_obscurePassword);
-                        _onFocusChange(); // actualizar animación
-                      }),
+                    icon: Icon(
+                      obscurePassword ? Icons.visibility : Icons.visibility_off,
+                    ),
+                    onPressed: () {
+                      setState(() {
+                        obscurePassword = !obscurePassword;
+                      });
+                    },
+                  ),
                 ),
-                onChanged: (value) {
-                  _onFocusChange(); // actualizar animación según visibilidad
-                }),
-
-            const SizedBox(height: 10),
-
-            // Olvidaste contraseña
-            SizedBox(
-              width: size.width,
-              child: const Text(
-                '¿Olvidaste tu contraseña?',
-                textAlign: TextAlign.right,
-                style: TextStyle(decoration: TextDecoration.underline),
               ),
-            ),
-
-            const SizedBox(height: 20),
-
-            // Botón Login
-            MaterialButton(
-              onPressed: () {},
-              color: const Color.fromARGB(255, 243, 33, 198),
-              minWidth: size.width,
-              height: 50,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
-              child: const Text(
-                'Login',
-                style: TextStyle(color: Colors.white, fontSize: 18),
-              ),
-            ),
-
-            const SizedBox(height: 10),
-
-            // Registro
-            SizedBox(
-              width: size.width,
-              child:
-                  Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                const Text('¿No tienes cuenta? '),
-                TextButton(
-                  onPressed: () {},
-                  child: const Text(
-                    '¡Regístrate aquí!',
-                    style: TextStyle(
-                      color: Colors.black,
-                      fontWeight: FontWeight.bold,
-                      decoration: TextDecoration.underline,
+              const SizedBox(height: 10),
+              SizedBox(
+                width: size.width,
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton(
+                    onPressed: () {},
+                    child: const Text(
+                      'Forgot your password?',
+                      style: TextStyle(
+                        decoration: TextDecoration.underline,
+                        color: Colors.black,
+                      ),
                     ),
                   ),
                 ),
-              ]),
-            )
-          ]),
+              ),
+              const SizedBox(height: 10),
+              MaterialButton(
+                minWidth: size.width,
+                height: 50,
+                color: Colors.purple,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                onPressed: () {},
+                child: const Text(
+                  'Login',
+                  style: TextStyle(color: Colors.white),
+                ),
+              ),
+              const SizedBox(height: 10),
+              SizedBox(
+                width: size.width,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Text("New here?"),
+                    TextButton(
+                      onPressed: () {},
+                      child: const Text(
+                        "Register",
+                        style: TextStyle(
+                          color: Colors.black,
+                          fontWeight: FontWeight.bold,
+                          decoration: TextDecoration.underline,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
