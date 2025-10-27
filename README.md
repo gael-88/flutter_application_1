@@ -67,7 +67,7 @@ https://github.com/user-attachments/assets/3efc9979-bb0e-4618-8ca6-85f7b8056ab1
 
 🏫 Subject: Mobile Application Development (Desarrollo de Aplicaciones Móviles)
 
-👨‍🏫 Teacher: [Gaxiola]
+👨‍🏫 Teacher: [Rodrigo Fidel Gaxiola Sosa ]
 
 🙌 Credits
 
