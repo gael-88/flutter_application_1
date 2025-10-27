@@ -62,7 +62,6 @@ https://github.com/user-attachments/assets/3efc9979-bb0e-4618-8ca6-85f7b8056ab1
 
 
 
-✅ Done! Your project page will now show a live animation demo directly on GitHub.
 
 📚 Course Information
 
